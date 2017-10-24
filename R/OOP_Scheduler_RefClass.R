@@ -1,3 +1,9 @@
+# If you don't want to specify what variable type a field should have, pass "ANY" as the value in the list of fields.
+# Any constructor logic needs to be in an optional function called initialize.
+# If the first line of a method is a string, it is interpreted as documentation for that method.
+# Inside a method, if you want to assign to a field, use global assignment (<<-).
+# http://adv-r.had.co.nz/OO-essentials.html#rc
+
 MyClass <- setRefClass(
   "MyClass",
   fields = list(
@@ -30,3 +36,10 @@ MyClass <- setRefClass(
     }
   )
 )
+
+obj1 <- MyClass$new()
+obj1$hello()
+obj1$doubleY()
+
+obj2 <- MyClass$new(x = TRUE, z = "ZZZ")
+obj2$printInput("I'm printing a line!")

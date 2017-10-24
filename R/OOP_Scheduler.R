@@ -1,4 +1,5 @@
-# Create Class Operation --------------------------------------------------
+
+# Operation ---------------------------------------------------------------
 Operation <- setClass(
   
   "Operation",
@@ -23,13 +24,13 @@ Operation <- setClass(
   }
 )
 
+# Func - getStartTime
 setGeneric(name="getStartTime",
            def=function(theObject)
            {
              standardGeneric("getStartTime")
            }
 )
-
 setMethod(f="getStartTime",
           signature="Operation",
           definition=function(theObject)
@@ -43,3 +44,26 @@ setMethod(f="getStartTime",
 
 x = Operation(opNme = "testOps", duration = 1.5 * 3600, startTime = Sys.time(), endTime = Sys.time() + 3600)
 x = getStartTime(x)
+
+
+
+# Job ---------------------------------------------------------------------
+Job <- setClass(
+  
+  "Job",
+  
+  slots = c(
+    oven = "Oven",
+    endTime = "POSIXct",
+    batchSize = "numeric",
+    ops = "Operation"
+  ),
+  
+  prototype = list(),
+  
+  validity = function(object)
+  {
+    
+  }
+)
+

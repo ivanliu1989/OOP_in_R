@@ -31,8 +31,7 @@ Operation <- setRefClass(
     }
   )
 )
-
-# obj1 <- Operation$new()
+# Test
 obj1 <- Operation$new(opNme = "testOps", duration = 1.5 * 3600, endTime = Sys.time() + 3600)
 obj1
 obj1$endTime = Sys.time() + 1800
@@ -41,3 +40,21 @@ obj1$getStartTime()
 obj1
 
 
+
+# Job ---------------------------------------------------------------------
+Job <- setRefClass(
+  "Job",
+  fields = list(
+    oven = "Oven",
+    endTime = "POSIXct",
+    batchSize = "numeric",
+    ops = "Operation"
+  ),
+  methods = list(
+    initialize = function()
+    {
+      
+    },
+    
+  )
+)

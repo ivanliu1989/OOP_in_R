@@ -225,22 +225,22 @@ Store <- setRefClass(
     },
     
     addOven = function(cty, cookTime, washCycleLength){
-      newOven = Oven(cty, cookTime, washCycleLength)
-      newOven$ovenId = length(ovens)
-      ovens[length(ovens)+1] = newOven$ovenId
+      newOven = Oven$new(cty, cookTime, washCycleLength)
+      newOven$ovenId <- length(ovens)
+      ovens[[length(ovens)+1]] <<- newOven
     },
     
     notCompliesWithShelfLife = function(startTime, endTime){
-      endTime = as.POSIXct(endTime)
-      startTime = as.POSIXct(startTime)
-      return((endTime - startTime) > 4 * 3600)
+      endTime = as.numeric(endTime)
+      startTime = as.numeric(startTime)
+      return((endTime - startTime) > 4 * 60)
     },
     
     planBatchSize = function(subsetSum, ovenIndx, indx, indxEnd, startingValue){
       ks = list(profile$keys)
-      val = profile[ks[indx]]
+      val = profile[[ks[[indx]]]]
       
-      if(notCompliesWithShelfLife(ks[indx], ks[indxEnd])){
+      if(notCompliesWithShelfLife(ks[[indx]], ks[[indxEnd]])){
         return()
       }else if(subsetSum == 0){ #base case 1: if the subset sum exactly matches the capacity 
         
@@ -248,7 +248,7 @@ Store <- setRefClass(
         
       }else if(indx == 0){ #base case 3 the current index equals zero
         
-      }else if(val > ovens[ovenIndx]$cty & subsetSum == ovens[[ovenIndx]]$cty){ #base case 4 if a measurement exceeds the oven capacity and the subsetSum equals oven capacity
+      }else if(val > ovens[[ovenIndx]]$cty & subsetSum == ovens[[ovenIndx]]$cty){ #base case 4 if a measurement exceeds the oven capacity and the subsetSum equals oven capacity
         
       }else{ #complex case
         
@@ -256,13 +256,13 @@ Store <- setRefClass(
     },
     
     planOvens = function(startingValue, sol, indx){
-      if(startingValue >= sum(profile$values) | indx == 0){
-        schedules[length(schedules) + 1] <- sol
+      if(startingValue >= sum(profile$values) | indx == 0){ # to be fixed <===========
+        schedules[[length(schedules)]] <- sol
         # print(schedules)
       }else{
         for(i in 1:length(ovens)){
           var = planBatchSize(ovens[[i]]$cty, i, indx, indx, 0)
-          sol[length(sol)+1] <- list(i, var[2], var[3])
+          sol[[length(sol)+1]] <- list(i, var[2], var[3])
           planOvens(startingValue+var[3], sol, var[1])
           sol[[length(sol)]] = NULL # backtrack
         }
@@ -277,12 +277,12 @@ Store <- setRefClass(
           sch$addJob(ovens[[jb[1]]], jb[2], jb[3])
         }
         mkSpn = sch.getMakespan()
-        lenSch = length(s) - 1
+        lenSch = length(s)
         if(mkSpn <= drtn){
           if(sch$meetsConstraints(lenSch - 1, lenSch)){
             drtn = mkSpn
             optSch <<- sch
-            print(mkSpn)
+            # print(mkSpn)
           }
         }
       }

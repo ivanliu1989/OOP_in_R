@@ -40,11 +40,35 @@ obj1$getStartTime()
 obj1
 
 
+# Store manager -----------------------------------------------------------
+StoreManager <- setRefClass(
+  "StoreManager",
+  fields = list(
+    stores = "ANY",
+    maxTime = "numeric"
+  ),
+  methods = list(
+    initialize = function()
+    {
+      "This method is called when you create an instance of the class."
+      stores <<- list()
+      maxTime <<- 9999999
+    },
+    
+    addStore = function(storeId, profile){
+      newStore <<- Store$new(storeId, profile)
+      stores[length(stores)+1] <<- newStore
+    }
+  )
+)
+storemanager1 <- StoreManager$new()
+
 
 # Oven --------------------------------------------------------------------
 Oven <- setRefClass(
   "Oven",
   fields = list(
+    ovenId = "ANY",
     cty = "numeric",
     cookTime = "numeric",
     washCycleLength = "numeric"
@@ -53,6 +77,7 @@ Oven <- setRefClass(
     initialize = function(cty, cookTime, washCycleLength)
     {
       "This method is called when you create an instance of the class."
+      ovenId <<- NA
       cty <<- cty
       cookTime <<- cookTime
       washCycleLength <<- washCycleLength
@@ -60,6 +85,68 @@ Oven <- setRefClass(
   )
 )
 oven1 <- Oven$new(cty = 1, cookTime = 120, washCycleLength = 10)
+
+
+# Job ---------------------------------------------------------------------
+Job <- setRefClass(
+  "Job",
+  fields = list(
+    oven = "ANY",
+    endTime = "POSIXct",
+    batchSize = "numeric",
+    jobId = "ANY"
+  ),
+  methods = list(
+    initialize = function(oven, endTime, batchSize)
+    {
+      endTime <<- endTime
+      jobId <<- NA
+      oven <<- oven
+      ops <<- list(unload = Operation$new(opNme = "unload", duration = 15),
+                   cook = Operation$new(opNme = "cook", duration = oven$cookTime),
+                   load_and_sprinkle = Operation$new(opNme = "load and sprinkle", duration = 15),
+                   rinse = Operation$new(opNme = "rinse", duration = oven$washCycleLength)
+      )
+    },
+    
+    getOpEndTimes = function()
+    {
+      prevOp <- endTime
+      for(i in ops){
+        if(is.na(i$endTime)){
+          i$endTime = prevOp 
+        }
+        i$getStartTime()
+        prevOp <- i$startTime
+      }
+    },
+    
+    getDuration = function()
+    {
+      tm <- 0
+      for(i in ops){
+        tm = i$duration + tm
+      }
+      return(tm)
+    },
+    
+    getStartTime = function()
+    {
+      startTime = ops[[length(ops)-1]] 
+      return(startTime)
+    },
+    
+    jobFollowsJob = function()
+    {
+      if(oven == prevJob$oven){
+        return(ops[[length(ops)-1]]$startTime >= prevJob$endTime)
+      }else{
+        return(TRUE)
+      }
+    }
+  )
+)
+
 
 # Schedule ----------------------------------------------------------------
 Schedule <- setRefClass(
@@ -197,88 +284,6 @@ Store <- setRefClass(
 
 Store$new()
 
-# Job ---------------------------------------------------------------------
-Job <- setRefClass(
-  "Job",
-  fields = list(
-    oven = "ANY",
-    endTime = "POSIXct",
-    batchSize = "numeric",
-    jobId = "ANY"
-  ),
-  methods = list(
-    initialize = function(oven, endTime, batchSize)
-    {
-      endTime <<- endTime
-      jobId <<- NA
-      oven <<- oven
-      ops <<- list(unload = Operation$new(opNme = "unload", duration = 15),
-                   cook = Operation$new(opNme = "cook", duration = oven$cookTime),
-                   load_and_sprinkle = Operation$new(opNme = "load and sprinkle", duration = 15),
-                   rinse = Operation$new(opNme = "rinse", duration = oven$washCycleLength)
-                   )
-    },
-    
-    getOpEndTimes = function()
-    {
-     prevOp <- endTime
-     for(i in ops){
-       if(is.na(i$endTime)){
-         i$endTime = prevOp 
-       }
-       i$getStartTime()
-       prevOp <- i$startTime
-     }
-    },
-    
-    getDuration = function()
-    {
-      tm <- 0
-      for(i in ops){
-        tm = i$duration + tm
-      }
-      return(tm)
-    },
-    
-    getStartTime = function()
-    {
-      startTime = ops[[length(ops)-1]] 
-      return(startTime)
-    },
-    
-    jobFollowsJob = function()
-    {
-      if(oven == prevJob$oven){
-        return(ops[[length(ops)-1]]$startTime >= prevJob$endTime)
-      }else{
-        return(TRUE)
-      }
-    }
-  )
-)
 
 
-
-# Store manager -----------------------------------------------------------
-StoreManager <- setRefClass(
-  "StoreManager",
-  fields = list(
-    stores = "ANY",
-    maxTime = "numeric"
-  ),
-  methods = list(
-    initialize = function(stores, maxTime)
-    {
-      "This method is called when you create an instance of the class."
-      stores <<- list()
-      maxTime <<- 99999
-    },
-    
-    addStore = function(){
-      newStore <<- Store$new(storeId, profile)
-      stores[length(stores)+1] <- newStore
-    }
-  )
-)
-oven1 <- Oven$new(cty = 1, cookTime = 120, washCycleLength = 10)
 

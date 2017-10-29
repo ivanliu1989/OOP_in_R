@@ -21,6 +21,24 @@ class Operation:
         self.startTime = self.endTime - self.duration
 
 
+class StoreManager():
+    def __init__(self):
+        self.stores = []
+        self.maxTime = dtm.timedelta.max
+
+    def addStore(self, storeId, profile):
+        newStore = Store(storeId, profile)
+        self.stores.append(newStore)  
+     
+
+class Oven:
+    def __init__(self, cty, cookTime, washCycleLength):
+        self.ovenId = None
+        self.cty = cty
+        self.cookTime = cookTime
+        self.washCycleLength = washCycleLength
+        
+
 class Job:
     def __init__(self, oven, endTime, batchSize):
         self.endTime = dtm.timedelta(hours = int(endTime[:2]), minutes = int(endTime[2:]))
@@ -61,13 +79,6 @@ class Job:
     __getOpEndTimes = getOpEndTimes   # private copy of original getOpEndTimes method which is called every time this class is instantiated 
 
 
-class Oven:
-    def __init__(self, cty, cookTime, washCycleLength):
-        self.ovenId = None
-        self.cty = cty
-        self.cookTime = cookTime
-        self.washCycleLength = washCycleLength
-        
         
 class Schedule:
     def __init__(self):
@@ -201,16 +212,6 @@ def readStores():
             file.append(row)
     return(file)
 
-
-class StoreManager():
-    def __init__(self):
-        self.stores = []
-        self.maxTime = dtm.timedelta.max
-
-    def addStore(self, storeId, profile):
-        newStore = Store(storeId, profile)
-        self.stores.append(newStore)  
-     
 
 def main(): #this function reads all the files
     

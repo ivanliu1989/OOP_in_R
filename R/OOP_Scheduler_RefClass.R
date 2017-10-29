@@ -32,7 +32,7 @@ Operation <- setRefClass(
   )
 )
 # Test
-obj1 <- Operation$new(opNme = "testOps", duration = 1.5 * 3600)
+obj1 <- Operation$new(opNme = "testOps", duration = 3600)
 obj1
 obj1$endTime = Sys.time() + 1800
 obj1
@@ -92,14 +92,16 @@ Job <- setRefClass(
   "Job",
   fields = list(
     oven = "ANY",
-    endTime = "POSIXct",
+    endTime = "numeric",
     batchSize = "numeric",
-    jobId = "ANY"
+    jobId = "ANY",
+    ops = "list"
   ),
   methods = list(
     initialize = function(oven, endTime, batchSize)
     {
       endTime <<- endTime
+      batchSize <<- batchSize
       jobId <<- NA
       oven <<- oven
       ops <<- list(unload = Operation$new(opNme = "unload", duration = 15),
@@ -107,8 +109,14 @@ Job <- setRefClass(
                    load_and_sprinkle = Operation$new(opNme = "load and sprinkle", duration = 15),
                    rinse = Operation$new(opNme = "rinse", duration = oven$washCycleLength)
       )
+      
+      # ops <- list(unload = Operation$new(opNme = "unload", duration = 15),
+      #             cook = Operation$new(opNme = "cook", duration = 300),
+      #             load_and_sprinkle = Operation$new(opNme = "load and sprinkle", duration = 15),
+      #             rinse = Operation$new(opNme = "rinse", duration = 300)
+      # )
+      # getOpEndTimes()
     },
-    
     getOpEndTimes = function()
     {
       prevOp <- endTime
@@ -132,14 +140,14 @@ Job <- setRefClass(
     
     getStartTime = function()
     {
-      startTime = ops[[length(ops)-1]] 
+      startTime = ops[[length(ops)]] 
       return(startTime)
     },
     
-    jobFollowsJob = function()
+    jobFollowsJob = function(prevJob)
     {
       if(oven == prevJob$oven){
-        return(ops[[length(ops)-1]]$startTime >= prevJob$endTime)
+        return(ops[[length(ops)]]$startTime >= prevJob$endTime)
       }else{
         return(TRUE)
       }
@@ -152,10 +160,10 @@ Job <- setRefClass(
 Schedule <- setRefClass(
   "Schedule",
   fields = list(
-    jobs = "ANY"
+    jobs = "list"
   ),
   methods = list(
-    initialize = function(jobs)
+    initialize = function()
     {
       "This method is called when you create an instance of the class."
       jobs <<- list()
@@ -163,7 +171,7 @@ Schedule <- setRefClass(
     addJob = function(oven, endTime, batchSize){
       newJob = Job$new(oven, endTime, batchSize)
       newJob$jobId = length(jobs)
-      jobs[length(jobs)+1] = newJob
+      jobs[[length(jobs)]] <<- newJob
     },
     meetsConstraints = function(nxt, current){
       if(nxt == 0){ #base case: stop when there is no next job
@@ -177,7 +185,7 @@ Schedule <- setRefClass(
     getMakespan = function(){
       tm = 0
       for(i in jobs){
-        tm <<- i$getDuration + tm
+        tm <- i$getDuration + tm
       }
       return(tm)
     },
@@ -204,7 +212,7 @@ Store <- setRefClass(
     ovens = "list",
     schedules = "list",
     forecast = "numeric",
-    optSch = "ANY"
+    optSch = "Schedule"
   ),
   methods = list(
     initialize = function(storeID, profile){
@@ -285,5 +293,62 @@ Store <- setRefClass(
 Store$new()
 
 
+
+# Read Data ---------------------------------------------------------------
+readOvenInfo = function(){
+  
+}
+
+readProfile = function(){
+  
+}
+
+readForecast = function(){
+  
+}
+
+readStores = function(){
+  
+}
+
+
+# Main Optimizer ----------------------------------------------------------
+mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateForecast = TRUE){
+  
+  sm = StoreManager$new()
+  
+  if(updateStoreList){
+    stores = readStores()[1]
+    
+    for(store in stores){
+      profile = readProfile()
+      prof = list()
+      for(time in profile){
+        prof[[time[2]]] = time[3]
+      }
+      sm$addStore(store, prof)
+      prof = list()
+    }
+  }
+  
+  if(updateOvenInfo){
+    ovenInfo = readOvenInfo()
+    for(store in sm$stores){
+      for(o in ovenInfo){
+        if(store$storeId == o[1]){
+          store$addOven(o[12], o[13], o[14])
+        }
+      }
+    }
+  }
+  
+  for(store in sm$stores){
+    lenProf = length(store$profile)
+    store$planOvens(0, list(), lenProf)
+    store$trySchedules()
+    store$optSch$printSchedule()
+  }
+  
+}
 
 

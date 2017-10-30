@@ -4,6 +4,8 @@
 # Inside a method, if you want to assign to a field, use global assignment (<<-).
 # http://adv-r.had.co.nz/OO-essentials.html#rc
 # http://adv-r.had.co.nz/R5.html
+
+
 rm(list = ls()); ls()
 # Operation ---------------------------------------------------------------
 Operation <- setRefClass(
@@ -34,7 +36,7 @@ Operation <- setRefClass(
 # Test
 obj1 <- Operation$new(opNme = "testOps", duration = 3600)
 obj1
-obj1$endTime = Sys.time() + 1800
+obj1$endTime = 1800
 obj1
 obj1$getStartTime()
 obj1
@@ -56,7 +58,7 @@ StoreManager <- setRefClass(
     },
     
     addStore = function(storeId, profile){
-      newStore <<- Store$new(storeId, profile)
+      newStore <- Store$new(storeId, profile)
       stores[length(stores)+1] <<- newStore
     }
   )
@@ -241,23 +243,23 @@ Store <- setRefClass(
       val = profile[[ks[[indx]]]]
       
       if(notCompliesWithShelfLife(ks[[indx]], ks[[indxEnd]])){
-        return()
+        return(1)
       }else if(subsetSum == 0){ #base case 1: if the subset sum exactly matches the capacity 
-        
+        return(2)
       }else if(subsetSum < 0){ #base case 2 if the subset sum exceeds the oven capacity
-        
+        return(3)
       }else if(indx == 0){ #base case 3 the current index equals zero
-        
+        return(4)
       }else if(val > ovens[[ovenIndx]]$cty & subsetSum == ovens[[ovenIndx]]$cty){ #base case 4 if a measurement exceeds the oven capacity and the subsetSum equals oven capacity
-        
+        return(5)
       }else{ #complex case
-        
+        return(6)
       }
     },
     
     planOvens = function(startingValue, sol, indx){
       if(startingValue >= sum(profile$values) | indx == 0){ # to be fixed <===========
-        schedules[[length(schedules)]] <- sol
+        schedules[[length(schedules)]] <<- sol
         # print(schedules)
       }else{
         for(i in 1:length(ovens)){
@@ -296,19 +298,19 @@ Store$new()
 
 # Read Data ---------------------------------------------------------------
 readOvenInfo = function(){
-  
+  file = data.table::fread("Files/ovenCapacityByStore.csv")
 }
 
 readProfile = function(){
-  
+  file = data.table::fread("Files/storeProfile.csv")
 }
 
 readForecast = function(){
-  
+  file = data.table::fread("Files/forecastStores.csv")
 }
 
 readStores = function(){
-  
+  file = data.table::fread("Files/stores.csv")
 }
 
 
@@ -350,5 +352,4 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
   }
   
 }
-
 

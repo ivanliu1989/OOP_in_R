@@ -149,6 +149,16 @@ Job <- setRefClass(
     jobFollowsJob = function(prevJob)
     {
       # if(oven == prevJob$oven){
+      
+      # sch$jobs[[12]]$jobFollowsJob(sch$jobs[[11]])
+      # prevJob = sch$jobs[[11]]
+      # curJob = sch$jobs[[12]]
+      # if(curJob$oven$cty == prevJob$oven$cty & curJob$oven$cookTime == prevJob$oven$cookTime & curJob$oven$washCycleLength == prevJob$oven$washCycleLength){
+      #   return(curJob$ops[[length(curJob$ops)]]$startTime >= prevJob$endTime)
+      # }else{
+      #   return(TRUE)
+      # }
+      
       if(oven$cty == prevJob$oven$cty & oven$cookTime == prevJob$oven$cookTime & oven$washCycleLength == prevJob$oven$washCycleLength){
         return(ops[[length(ops)]]$startTime >= prevJob$endTime)
       }else{
@@ -333,13 +343,17 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
   if(updateStoreList){
     stores = readStores()[1]
     
-    for(store in stores){
+    for(store in stores$V1){
       profile = readProfile()
+      profile[, V1 := 525] # Impute hours with no sales
+      profile = profile[V1 == store]
+      
       # plot(profile$V3, type = 'l')
+      
       prof = list()
-      for(time in 1:nrow(profile)){
-        time = as.numeric(profile[time])
-        prof[as.character(time[2])] = time[3]
+      for(time in profile$V2){
+        time = profile[V2==time]
+        prof[as.character(time$V2)] = as.numeric(time$V3)
       }
       sm$addStore(store, prof)
       prof = list()

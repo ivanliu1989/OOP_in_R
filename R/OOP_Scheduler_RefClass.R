@@ -59,7 +59,7 @@ StoreManager <- setRefClass(
     
     addStore = function(storeId, profile){
       newStore <- Store$new(storeId, profile)
-      stores[length(stores)+1] <<- newStore
+      stores[[length(stores)+1]] <<- newStore
     }
   )
 )
@@ -117,7 +117,7 @@ Job <- setRefClass(
       #             load_and_sprinkle = Operation$new(opNme = "load and sprinkle", duration = 15),
       #             rinse = Operation$new(opNme = "rinse", duration = 300)
       # )
-      # getOpEndTimes()
+      getOpEndTimes()
     },
     getOpEndTimes = function()
     {
@@ -149,7 +149,7 @@ Job <- setRefClass(
     jobFollowsJob = function(prevJob)
     {
       # if(oven == prevJob$oven){
-      
+      # store$schedules[[1]]
       # sch$jobs[[12]]$jobFollowsJob(sch$jobs[[11]])
       # prevJob = sch$jobs[[11]]
       # curJob = sch$jobs[[12]]
@@ -250,10 +250,10 @@ Store <- setRefClass(
     },
     
     planBatchSize = function(subsetSum, ovenIndx, indx, indxEnd, startingValue){
-      ks = names(store$profile)
-      val = profile[[ks[indx]]]
+      ks = names(profile)
+      val = profile[[ks[indx]]] # time & its forecast
       
-      if(notCompliesWithShelfLife(ks[indx], ks[indxEnd])){
+      if(notCompliesWithShelfLife(ks[indx], ks[indxEnd])){ # if cook time over 4 hours
         print("1st")
         return(c(indx+1, ks[indx+1], startingValue - as.numeric(profile[[ks[indx+1]]])))
       }else if(subsetSum == 0){ #base case 1: if the subset sum exactly matches the capacity 
@@ -267,7 +267,7 @@ Store <- setRefClass(
         return(c(indx,ks[indx],startingValue))
       }else if(val > ovens[[ovenIndx]]$cty & subsetSum == ovens[[ovenIndx]]$cty){ #base case 4 if a measurement exceeds the oven capacity and the subsetSum equals oven capacity
         print("5th")
-        return(c(indx-1,ks[indx-1],ovens[[ovenIndx]]$cty))
+        return(c(indx-1,ks[indx-1],ovens[[ovenIndx]]$cty)) #???
       }else{ #complex case
         print("6th")
         return(planBatchSize(subsetSum-val, ovenIndx, indx-1, indxEnd, startingValue+val))
@@ -276,16 +276,20 @@ Store <- setRefClass(
     
     planOvens = function(startingValue, sol, indx){
       
-      # store$planOvens(0, list(), lenProf)
+      # length(store$ovens)
+      # indx = lenProf
       
-      if(startingValue >= sum(unlist(profile)) | indx == 1){ # to be fixed <===========
+      if(startingValue >= sum(unlist(profile)) | indx == 1){ 
+        # if start val over total demands (forecast) OR time index (every 15 mins) is 1
         schedules[[length(schedules)+1]] <<- sol
         # print(schedules)
       }else{
         for(i in 1:length(ovens)){
           print(paste0("Planning for Oven: ", i))
-          var = planBatchSize(ovens[[i]]$cty, i, indx, indx, 0)
-          sol[[length(sol)+1]] <- c(i, as.numeric(var[2]), as.numeric(var[3]))
+          var = planBatchSize(ovens[[i]]$cty, i, indx, indx, 0) # ovenCapacity, ovanIdx, timeIdx, timeEndIdx, startVal
+          # return c(time idx, time name, remaining demands)
+          
+          sol[[length(sol)+1]] <- c(i, as.numeric(var[2]), as.numeric(var[3])) # ovenId, time, remaining demands
           # print(var[3])
           planOvens(startingValue+as.numeric(var[3]), sol, as.numeric(var[1]))
           sol[[length(sol)]] = NULL # backtrack
@@ -294,13 +298,17 @@ Store <- setRefClass(
     },
     
     trySchedules = function(){
+      # schedules = store$schedules
       drtn = 999999999
-      for(s in schedules){
+      for(s in 1:length(schedules)){
+        s = schedules[[s]]
         sch = Schedule$new()
-        for(jb in s){
-          sch$addJob(ovens[[jb[1]]], jb[2], jb[3])
+        for(jb in 1:length(s)){
+          jb = s[[jb]]
+          # sch$addJob(store$ovens[[jb[1]]], jb[2], jb[3]) # <=================
+          sch$addJob(ovens[[jb[1]]], jb[2], jb[3]) 
         }
-        mkSpn = sch$getMakespan()
+        mkSpn = sch$getMakespan() # start Time integer negative <============================
         lenSch = length(s)
         if(mkSpn <= drtn){
           if(sch$meetsConstraints(lenSch - 1, lenSch)){
@@ -340,15 +348,14 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
   
   sm = StoreManager$new()
   
+  # Add Stores and their profiles to Store Manager
   if(updateStoreList){
     stores = readStores()[1]
-    
     for(store in stores$V1){
+      # store = stores$V1[1]
       profile = readProfile()
       profile[, V1 := 525] # Impute hours with no sales
       profile = profile[V1 == store]
-      
-      # plot(profile$V3, type = 'l')
       
       prof = list()
       for(time in profile$V2){
@@ -356,29 +363,34 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
         prof[as.character(time$V2)] = as.numeric(time$V3)
       }
       sm$addStore(store, prof)
-      prof = list()
     }
   }
   
+  # Add Oven Info for each store
   if(updateOvenInfo){
     ovenInfo = readOvenInfo()
-    for(store in sm$stores){
-      for(o in 1:nrow(ovenInfo)){
-        o = ovenInfo[o]
-        if(store$storeId == o$Store){
-          store$addOven(as.numeric(o$Capacity), as.numeric(o$AvgCookTime), as.numeric(o$CleanBetweenCooks))
-        }
+    for(store in 1:length(sm$stores)){
+      store = sm$stores[[store]]
+      ovenInfoSt = ovenInfo[Store == store$storeId]
+      for(o in 1:nrow(ovenInfoSt)){
+        o = ovenInfoSt[o]
+        store$addOven(as.numeric(o$Capacity), as.numeric(o$AvgCookTime), as.numeric(o$CleanBetweenCooks))
       }
     }
   }
   
-  for(store in sm$stores){
+  # Plan out schedules for each store
+  for(store in 1:length(sm$stores)){
     # store = sm$stores[[1]]
+    store = sm$stores[[store]]
     lenProf = length(store$profile)
-    store$planOvens(0, list(), lenProf)
+    store$planOvens(startingValue = 0, sol = list(), indx = lenProf)
+    
+    # to be reviewed
     store$trySchedules()
     store$optSch$printSchedule()
   }
   
 }
 
+mainOptimizer()

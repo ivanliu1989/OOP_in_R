@@ -255,7 +255,7 @@ Store <- setRefClass(
     },
     
     planOvens = function(startingValue, sol, indx){
-      if(startingValue >= sum(unlist(profile)) | indx == 1){  #<=======================
+      if(startingValue >= sum(unlist(profile)) | indx == 1){  # ???
         # if start val over total demands (forecast) OR time index (every 15 mins) is 1
         schedules[[length(schedules)+1]] <<- sol
         # print(schedules)
@@ -263,7 +263,7 @@ Store <- setRefClass(
         for(i in 1:length(ovens)){
           print(paste0("Planning for Oven: ", i))
           var = planBatchSize(ovens[[i]]$cty, i, indx, indx, 0) # ovenCapacity, ovenIdx, timeIdx, timeEndIdx, startVal
-
+          
           sol[[length(sol)+1]] <- c(i, as.numeric(var[2]), as.numeric(var[3])) # ovenId, time, remaining demands
           # print(var[3])
           planOvens(startingValue+as.numeric(var[3]), sol, as.numeric(var[1]))
@@ -321,7 +321,7 @@ getCookTimeDiff = function(start, end){
     stop("Wrong time format")
   start.min = as.numeric(substr(start, 1,2)) * 60 + as.numeric(substr(start, 3,4))
   end.min = as.numeric(substr(end, 1,2)) * 60 + as.numeric(substr(end, 3,4))
-
+  
   time.diff = end.min - start.min
   if(time.diff<0)
     stop("Wrong time")
@@ -358,7 +358,7 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
       profile[, V1 := 525] # Impute hours with no sales
       profile = profile[V1 == store]
       profile[, timeMin := gsub(" ", "", paste(ifelse(4-nchar(V2) > 0, paste(rep(0, 4-nchar(V2)), collapse = ""), ""), V2, collapse = "")), by = .(V1,V2)]
-
+      
       prof = list()
       for(time in profile$timeMin){
         time = profile[timeMin==time]
@@ -397,3 +397,10 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
 }
 
 optimal_store = mainOptimizer()
+optimal_sch = optimal_store$optSch$printSchedule()
+optimal_sch[, opStartTime2 := getMinToTime(opStartTime + 120), by = .(jobId, opNme)]
+optimal_sch[, opEndTime2 := getMinToTime(opEndTime + 120), by = .(jobId, opNme)]
+View(optimal_sch)
+# Issues:
+# 1. Negative time
+# 2. Only one oven used

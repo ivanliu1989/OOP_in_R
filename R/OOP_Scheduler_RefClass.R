@@ -186,7 +186,12 @@ Schedule <- setRefClass(
         schJob[, jobId := jb$jobId]
         schJob[, batchSize := jb$batchSize]
         schJob[, jobEndTime := jb$endTime]
-        schJob[, c(5:7,1:4), with = F]
+        schJob[, ovenId := jb$oven$ovenId]
+        schJob[, ovenCty := jb$oven$cty]
+        schJob[, ovenCookTime := jb$oven$cookTime]
+        schJob[, ovenWashCycleLength := jb$oven$washCycleLength]
+        
+        schJob[, c(5:11,1:4), with = F]
       }))
       print(fnlSch)
       fnlSch
@@ -261,12 +266,11 @@ Store <- setRefClass(
         # print(schedules)
       }else{
         for(i in 1:length(ovens)){
-          print(paste0("Planning for Oven: ", i))
+          # print(paste0("Planning for Oven: ", i))
           var = planBatchSize(ovens[[i]]$cty, i, indx, indx, 0) # ovenCapacity, ovenIdx, timeIdx, timeEndIdx, startVal
-          
           sol[[length(sol)+1]] <- c(i, as.numeric(var[2]), as.numeric(var[3])) # ovenId, time, remaining demands
-          # print(var[3])
-          planOvens(startingValue+as.numeric(var[3]), sol, as.numeric(var[1]))
+          
+          planOvens(startingValue+as.numeric(var[3]), sol, as.numeric(var[1])) # <======== to fix only one oven is used
           sol[[length(sol)]] = NULL # backtrack (?)
         }
       }

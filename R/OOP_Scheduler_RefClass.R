@@ -33,13 +33,6 @@ Operation <- setRefClass(
     }
   )
 )
-# Test
-# obj1 <- Operation$new(opNme = "testOps", duration = 3600)
-# obj1
-# obj1$endTime = 1800
-# obj1
-# obj1$getStartTime()
-# obj1
 
 
 # Store manager -----------------------------------------------------------
@@ -63,7 +56,6 @@ StoreManager <- setRefClass(
     }
   )
 )
-# storemanager1 <- StoreManager$new()
 
 
 # Oven --------------------------------------------------------------------
@@ -86,7 +78,6 @@ Oven <- setRefClass(
     }
   )
 )
-# oven1 <- Oven$new(cty = 1, cookTime = 120, washCycleLength = 10)
 
 
 # Job ---------------------------------------------------------------------
@@ -279,14 +270,14 @@ Store <- setRefClass(
       # length(store$ovens)
       # indx = lenProf
       
-      if(startingValue >= sum(unlist(profile)) | indx == 1){ 
+      if(startingValue >= sum(unlist(profile)) | indx == 0){ 
         # if start val over total demands (forecast) OR time index (every 15 mins) is 1
         schedules[[length(schedules)+1]] <<- sol
         # print(schedules)
       }else{
         for(i in 1:length(ovens)){
           print(paste0("Planning for Oven: ", i))
-          var = planBatchSize(ovens[[i]]$cty, i, indx, indx, 0) # ovenCapacity, ovanIdx, timeIdx, timeEndIdx, startVal
+          var = planBatchSize(ovens[[i]]$cty, i, indx, indx, 0) # ovenCapacity, ovenIdx, timeIdx, timeEndIdx, startVal
           # return c(time idx, time name, remaining demands)
           
           sol[[length(sol)+1]] <- c(i, as.numeric(var[2]), as.numeric(var[3])) # ovenId, time, remaining demands
@@ -321,11 +312,10 @@ Store <- setRefClass(
     }
   )
 )
-# Store$new()
-
 
 
 # Read Data ---------------------------------------------------------------
+# These all need to be read from BIW later
 readOvenInfo = function(){
   file = data.table::fread("Files/ovenCapacityByStore.csv")
 }
@@ -343,6 +333,34 @@ readStores = function(){
 }
 
 
+# Time Conversion ---------------------------------------------------------
+getCookTimeDiff = function(start, end){
+  if(!is.character(start) | !is.character(end) | nchar(start) != 4 | nchar(end) != 4)  
+    stop("Wrong time format")
+  start.min = as.numeric(substr(start, 1,2)) * 60 + as.numeric(substr(start, 3,4))
+  end.min = as.numeric(substr(end, 1,2)) * 60 + as.numeric(substr(end, 3,4))
+
+  time.diff = end.min - start.min
+  if(time.diff<0)
+    stop("Wrong time")
+  time.diff
+}
+
+getTimeToMin = function(cooktime){
+  if(!is.character(cooktime) | nchar(cooktime) != 4)  
+    stop("Wrong time format")
+  cooktime.min = as.numeric(substr(cooktime, 1,2)) * 60 + as.numeric(substr(cooktime, 3,4))
+  cooktime.min
+}
+
+getMinToTime = function(cooktime){
+  if(!is.numeric(cooktime) | cooktime<0)  
+    stop("Wrong number provided")
+  cooktime.min = paste0(round(cooktime / 60), cooktime%%60)
+  cooktime.min
+}
+# getMinToTime(getTimeToMin("2215"))
+
 # Main Optimizer ----------------------------------------------------------
 mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateForecast = TRUE){
   
@@ -353,14 +371,15 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
     stores = readStores()[1]
     for(store in stores$V1){
       # store = stores$V1[1]
-      profile = readProfile()
+      profile = readProfile() # <=== This need to be read from BIW later
       profile[, V1 := 525] # Impute hours with no sales
       profile = profile[V1 == store]
-      
+      profile[, timeMin := gsub(" ", "", paste(ifelse(4-nchar(V2) > 0, paste(rep(0, 4-nchar(V2)), collapse = ""), ""), V2, collapse = "")), by = .(V1,V2)]
+
       prof = list()
-      for(time in profile$V2){
-        time = profile[V2==time]
-        prof[as.character(time$V2)] = as.numeric(time$V3)
+      for(time in profile$timeMin){
+        time = profile[timeMin==time]
+        prof[as.character(time$timeMin)] = as.numeric(time$V3)
       }
       sm$addStore(store, prof)
     }

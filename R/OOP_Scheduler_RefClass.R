@@ -1,8 +1,3 @@
-# If you don't want to specify what variable type a field should have, pass "ANY" as the value in the list of fields.
-# Any constructor logic needs to be in an optional function called initialize.
-# If the first line of a method is a string, it is interpreted as documentation for that method.
-# Inside a method, if you want to assign to a field, use global assignment (<<-).
-# http://adv-r.had.co.nz/OO-essentials.html#rc
 # http://adv-r.had.co.nz/R5.html
 
 
@@ -19,16 +14,15 @@ Operation <- setRefClass(
   methods = list(
     initialize = function(opNme, duration)
     {
-      "This method is called when you create an instance of the class."
+      "Operations of cooking - unload, cook, load and sprinkle, rinse and etc."
       opNme <<- opNme
       duration <<- duration
       endTime <<- NA
       startTime <<- NA
-      # print(paste0(opNme, ": ", startTime, ", ", endTime))
     },
     getStartTime = function()
     {
-      print("Get Start Time of the Operation")
+      print(paste0("Get Start Time of the Operation - ", opNme, ": ", startTime, ", ", endTime))
       startTime <<- endTime - duration
     }
   )
@@ -45,7 +39,7 @@ StoreManager <- setRefClass(
   methods = list(
     initialize = function()
     {
-      "This method is called when you create an instance of the class."
+      "Store manager"
       stores <<- list()
       maxTime <<- 9999999
     },
@@ -70,7 +64,7 @@ Oven <- setRefClass(
   methods = list(
     initialize = function(cty, cookTime, washCycleLength)
     {
-      "This method is called when you create an instance of the class."
+      "An oven with maximum capacity, average cooking time and wash time"
       ovenId <<- NA
       cty <<- cty
       cookTime <<- cookTime
@@ -93,6 +87,7 @@ Job <- setRefClass(
   methods = list(
     initialize = function(oven, endTime, batchSize)
     {
+      "A job includes a series of operations for cooking by an oven at the certain time"
       endTime <<- endTime
       batchSize <<- batchSize
       jobId <<- NA
@@ -103,11 +98,6 @@ Job <- setRefClass(
                    rinse = Operation$new(opNme = "rinse", duration = oven$washCycleLength)
       )
       
-      # ops <- list(unload = Operation$new(opNme = "unload", duration = 15),
-      #             cook = Operation$new(opNme = "cook", duration = 300),
-      #             load_and_sprinkle = Operation$new(opNme = "load and sprinkle", duration = 15),
-      #             rinse = Operation$new(opNme = "rinse", duration = 300)
-      # )
       getOpEndTimes()
     },
     getOpEndTimes = function()
@@ -139,17 +129,6 @@ Job <- setRefClass(
     
     jobFollowsJob = function(prevJob)
     {
-      # if(oven == prevJob$oven){
-      # store$schedules[[1]]
-      # sch$jobs[[12]]$jobFollowsJob(sch$jobs[[11]])
-      # prevJob = sch$jobs[[11]]
-      # curJob = sch$jobs[[12]]
-      # if(curJob$oven$cty == prevJob$oven$cty & curJob$oven$cookTime == prevJob$oven$cookTime & curJob$oven$washCycleLength == prevJob$oven$washCycleLength){
-      #   return(curJob$ops[[length(curJob$ops)]]$startTime >= prevJob$endTime)
-      # }else{
-      #   return(TRUE)
-      # }
-      
       if(oven$cty == prevJob$oven$cty & oven$cookTime == prevJob$oven$cookTime & oven$washCycleLength == prevJob$oven$washCycleLength){
         return(ops[[length(ops)]]$startTime >= prevJob$endTime)
       }else{
@@ -169,7 +148,7 @@ Schedule <- setRefClass(
   methods = list(
     initialize = function()
     {
-      "This method is called when you create an instance of the class."
+      "A schedule includes cooking jobs for all ovens within a store for a given day"
       jobs <<- list()
     },
     addJob = function(oven, endTime, batchSize){
@@ -220,6 +199,7 @@ Store <- setRefClass(
   ),
   methods = list(
     initialize = function(storeId, profile){
+      "A store has multiple ovens and sales profile/forecast for a given day and will have a optimal schedule of cooking for that day"
       storeId <<- storeId
       ovens <<- list()
       schedules <<- list()
@@ -266,11 +246,7 @@ Store <- setRefClass(
     },
     
     planOvens = function(startingValue, sol, indx){
-      
-      # length(store$ovens)
-      # indx = lenProf
-      
-      if(startingValue >= sum(unlist(profile)) | indx == 0){ 
+      if(startingValue >= sum(unlist(profile)) | indx == 1){  #<=======================
         # if start val over total demands (forecast) OR time index (every 15 mins) is 1
         schedules[[length(schedules)+1]] <<- sol
         # print(schedules)
@@ -278,12 +254,11 @@ Store <- setRefClass(
         for(i in 1:length(ovens)){
           print(paste0("Planning for Oven: ", i))
           var = planBatchSize(ovens[[i]]$cty, i, indx, indx, 0) # ovenCapacity, ovenIdx, timeIdx, timeEndIdx, startVal
-          # return c(time idx, time name, remaining demands)
-          
+
           sol[[length(sol)+1]] <- c(i, as.numeric(var[2]), as.numeric(var[3])) # ovenId, time, remaining demands
           # print(var[3])
           planOvens(startingValue+as.numeric(var[3]), sol, as.numeric(var[1]))
-          sol[[length(sol)]] = NULL # backtrack
+          sol[[length(sol)]] = NULL # backtrack (?)
         }
       }
     },
@@ -296,7 +271,6 @@ Store <- setRefClass(
         sch = Schedule$new()
         for(jb in 1:length(s)){
           jb = s[[jb]]
-          # sch$addJob(store$ovens[[jb[1]]], jb[2], jb[3]) # <=================
           sch$addJob(ovens[[jb[1]]], jb[2], jb[3]) 
         }
         mkSpn = sch$getMakespan() # start Time integer negative <============================
@@ -305,7 +279,6 @@ Store <- setRefClass(
           if(sch$meetsConstraints(lenSch - 1, lenSch)){
             drtn = mkSpn
             optSch <<- sch
-            # print(mkSpn)
           }
         }
       }
@@ -361,6 +334,7 @@ getMinToTime = function(cooktime){
 }
 # getMinToTime(getTimeToMin("2215"))
 
+
 # Main Optimizer ----------------------------------------------------------
 mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateForecast = TRUE){
   
@@ -410,6 +384,7 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
     store$optSch$printSchedule()
   }
   
+  return(store)
 }
 
-mainOptimizer()
+optimal_store = mainOptimizer()

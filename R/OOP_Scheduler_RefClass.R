@@ -173,14 +173,23 @@ Schedule <- setRefClass(
       return(tm)
     },
     printSchedule = function(){
-      for(jb in length(jobs):1){
-        jb = jobs[[jb]]
-        print(jb)
-        for(op in length(jb$ops):1){
-          op = jb$ops[[op]]
-          print(op)
-        }
-      }
+      library(data.table)
+      fnlSch = rbindlist(lapply(length(jobs):1, function(x){
+        jb = jobs[[x]]
+        schJob = rbindlist(lapply(length(jb$ops):1, function(x){
+          op = jb$ops[[x]]
+          return(data.table(opNme = op$opNme,
+                            opDuration = op$duration,
+                            opStartTime = op$startTime,
+                            opEndTime = op$endTime))
+        }))
+        schJob[, jobId := jb$jobId]
+        schJob[, batchSize := jb$batchSize]
+        schJob[, jobEndTime := jb$endTime]
+        schJob[, c(5:7,1:4), with = F]
+      }))
+      print(fnlSch)
+      fnlSch
     }
   )
 )

@@ -1,6 +1,5 @@
 # http://adv-r.had.co.nz/R5.html
 
-
 rm(list = ls()); ls()
 # Operation ---------------------------------------------------------------
 Operation <- setRefClass(
@@ -180,12 +179,12 @@ Schedule <- setRefClass(
           op = jb$ops[[x]]
           return(data.table(opNme = op$opNme,
                             opDuration = op$duration,
-                            opStartTime = op$startTime,
-                            opEndTime = op$endTime))
+                            opStartTime = getMinToTime(op$startTime),
+                            opEndTime = getMinToTime(op$endTime)))
         }))
         schJob[, jobId := jb$jobId]
         schJob[, batchSize := jb$batchSize]
-        schJob[, jobEndTime := jb$endTime]
+        schJob[, jobEndTime := getMinToTime(jb$endTime)]
         schJob[, ovenId := jb$oven$ovenId]
         schJob[, ovenCty := jb$oven$cty]
         schJob[, ovenCookTime := jb$oven$cookTime]
@@ -240,19 +239,19 @@ Store <- setRefClass(
       
       if(notCompliesWithShelfLife(ks[indx], ks[indxEnd])){ # if cook time over 4 hours
         print("1st")
-        return(c(indx+1, ks[indx+1], startingValue - as.numeric(profile[[ks[indx+1]]])))
+        return(c(indx+1, getTimeToMin(ks[indx+1]), startingValue - as.numeric(profile[[ks[indx+1]]])))
       }else if(subsetSum == 0){ #base case 1: if the subset sum exactly matches the capacity 
         print("2nd")
-        return(c(indx,ks[indx],startingValue))
+        return(c(indx,getTimeToMin(ks[indx]),startingValue))
       }else if(subsetSum < 0){ #base case 2 if the subset sum exceeds the oven capacity
         print("3rd")
-        return(c(indx+1, ks[indx+1], startingValue - as.numeric(profile[[ks[indx+1]]])))
+        return(c(indx+1, getTimeToMin(ks[indx+1]), startingValue - as.numeric(profile[[ks[indx+1]]])))
       }else if(indx == 1){ #base case 3 the current index equals zero
         print("4th")
-        return(c(indx,ks[indx],startingValue))
+        return(c(indx,getTimeToMin(ks[indx]),startingValue))
       }else if(val > ovens[[ovenIndx]]$cty & subsetSum == ovens[[ovenIndx]]$cty){ #base case 4 if a measurement exceeds the oven capacity and the subsetSum equals oven capacity
         print("5th")
-        return(c(indx-1,ks[indx-1],ovens[[ovenIndx]]$cty)) #???
+        return(c(indx-1,getTimeToMin(ks[indx-1]),ovens[[ovenIndx]]$cty)) #???
       }else{ #complex case
         print("6th")
         return(planBatchSize(subsetSum-val, ovenIndx, indx-1, indxEnd, startingValue+val))
@@ -320,29 +319,31 @@ readStores = function(){
 
 
 # Time Conversion ---------------------------------------------------------
-getCookTimeDiff = function(start, end){
-  if(!is.character(start) | !is.character(end) | nchar(start) != 4 | nchar(end) != 4)  
-    stop("Wrong time format")
-  start.min = as.numeric(substr(start, 1,2)) * 60 + as.numeric(substr(start, 3,4))
-  end.min = as.numeric(substr(end, 1,2)) * 60 + as.numeric(substr(end, 3,4))
-  
-  time.diff = end.min - start.min
-  if(time.diff<0)
-    stop("Wrong time")
-  time.diff
-}
+# getCookTimeDiff = function(start, end){
+#   if(!is.character(start) | !is.character(end) | nchar(start) != 4 | nchar(end) != 4)  
+#     stop("Wrong time format")
+#   start.min = as.numeric(substr(start, 1,2)) * 60 + as.numeric(substr(start, 3,4))
+#   end.min = as.numeric(substr(end, 1,2)) * 60 + as.numeric(substr(end, 3,4))
+#   
+#   time.diff = end.min - start.min
+#   if(time.diff<0)
+#     stop("Wrong time")
+#   time.diff
+# }
 
 getTimeToMin = function(cooktime){
-  if(!is.character(cooktime) | nchar(cooktime) != 4)  
-    stop("Wrong time format")
+  # if(!is.character(cooktime) | nchar(cooktime) != 4)  
+  #   stop("Wrong time format")
+  # cooktime.min = as.POSIXct("00:00", format = "%H:%M") + as.numeric(cooktime) * 60
   cooktime.min = as.numeric(substr(cooktime, 1,2)) * 60 + as.numeric(substr(cooktime, 3,4))
   cooktime.min
 }
 
 getMinToTime = function(cooktime){
-  if(!is.numeric(cooktime) | cooktime<0)  
-    stop("Wrong number provided")
-  cooktime.min = paste0(round(cooktime / 60), cooktime%%60)
+  # if(!is.numeric(cooktime) | cooktime<0)  
+  # stop("Wrong number provided")
+  # cooktime.min = paste0(round(cooktime / 60), cooktime%%60)
+  cooktime.min = as.POSIXct("00:00", format = "%H:%M") + as.numeric(cooktime) * 60
   cooktime.min
 }
 # getMinToTime(getTimeToMin("2215"))
@@ -400,11 +401,16 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
   return(store)
 }
 
+
+
+# Test & Run --------------------------------------------------------------
 optimal_store = mainOptimizer()
 optimal_sch = optimal_store$optSch$printSchedule()
-optimal_sch[, opStartTime2 := getMinToTime(opStartTime + 120), by = .(jobId, opNme)]
-optimal_sch[, opEndTime2 := getMinToTime(opEndTime + 120), by = .(jobId, opNme)]
 View(optimal_sch)
-# Issues:
-# 1. Negative time
-# 2. Only one oven used
+
+optional_jobs = unique(optimal_sch[, .(jobId, jobEndTime, batchSize)])
+optional_jobs[, batchSizeCum := cumsum(batchSize)]
+plot(cumsum(unlist(optimal_store$profile)), 
+     x = getMinToTime(getTimeToMin(names(unlist(optimal_store$profile)))), 
+     type = 'l')
+points(optional_jobs$batchSizeCum, x = optional_jobs$jobEndTime)

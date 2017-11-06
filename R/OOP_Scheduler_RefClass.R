@@ -229,8 +229,8 @@ Store <- setRefClass(
     },
     
     notCompliesWithShelfLife = function(startTime, endTime){
-      endTime = as.numeric(endTime)
-      startTime = as.numeric(startTime)
+      endTime = getTimeToMin(endTime)
+      startTime = getTimeToMin(startTime)
       return((endTime - startTime) > 4 * 60)
     },
     

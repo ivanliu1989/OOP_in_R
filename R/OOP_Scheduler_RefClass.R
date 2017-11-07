@@ -398,19 +398,23 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
     store$optSch$printSchedule()
   }
   
-  return(store)
+  return(sm)
 }
 
 
 
 # Test & Run --------------------------------------------------------------
-optimal_store = mainOptimizer()
+optimal_manager = mainOptimizer()
+optimal_store = optimal_manager$stores[[1]]
 optimal_sch = optimal_store$optSch$printSchedule()
 View(optimal_sch)
 
-optional_jobs = unique(optimal_sch[, .(jobId, jobEndTime, batchSize)])
-optional_jobs[, batchSizeCum := cumsum(batchSize)]
+optimal_jobs = unique(optimal_sch[, .(jobId, jobEndTime, batchSize)])
+optimal_jobs[, batchSizeCum := cumsum(batchSize)]
 plot(cumsum(unlist(optimal_store$profile)), 
      x = getMinToTime(getTimeToMin(names(unlist(optimal_store$profile)))), 
      type = 'l')
-points(optional_jobs$batchSizeCum, x = optional_jobs$jobEndTime)
+points(optimal_jobs$batchSizeCum, x = optimal_jobs$jobEndTime, col = "red")
+points(optimal_jobs$batchSizeCum, 
+       x = c(optimal_jobs$jobEndTime[-1], tail(getMinToTime(getTimeToMin(names(unlist(optimal_store$profile)))),1)),
+       col = "blue")

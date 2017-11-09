@@ -21,7 +21,7 @@ Operation <- setRefClass(
     },
     getStartTime = function()
     {
-      print(paste0("Get Start Time of the Operation - ", opNme, ": ", startTime, ", ", endTime))
+      # print(paste0("Get Start Time of the Operation - ", opNme, ": ", startTime, ", ", endTime))
       startTime <<- endTime - duration
     }
   )
@@ -43,7 +43,8 @@ StoreManager <- setRefClass(
       maxTime <<- 9999999
     },
     
-    addStore = function(storeId, profile){
+    addStore = function(storeId, profile)
+    {
       newStore <- Store$new(storeId, profile)
       stores[[length(stores)+1]] <<- newStore
     }
@@ -91,10 +92,10 @@ Job <- setRefClass(
       batchSize <<- batchSize
       jobId <<- NA
       oven <<- oven
-      ops <<- list(unload = Operation$new(opNme = "unload", duration = 15),
+      ops <<- list(rinse = Operation$new(opNme = "rinse", duration = oven$washCycleLength),
+                   unload = Operation$new(opNme = "unload", duration = 15),
                    cook = Operation$new(opNme = "cook", duration = oven$cookTime),
-                   load_and_sprinkle = Operation$new(opNme = "load and sprinkle", duration = 15),
-                   rinse = Operation$new(opNme = "rinse", duration = oven$washCycleLength)
+                   load_and_sprinkle = Operation$new(opNme = "load and sprinkle", duration = 15)
       )
       
       getOpEndTimes()
@@ -128,7 +129,7 @@ Job <- setRefClass(
     
     jobFollowsJob = function(prevJob)
     {
-      if(oven$cty == prevJob$oven$cty & oven$cookTime == prevJob$oven$cookTime & oven$washCycleLength == prevJob$oven$washCycleLength){
+      if(oven$ovenId == prevJob$oven$ovenId){
         return(ops[[length(ops)]]$startTime >= prevJob$endTime)
       }else{
         return(TRUE)
@@ -171,7 +172,7 @@ Schedule <- setRefClass(
       }
       return(tm)
     },
-    printSchedule = function(){
+    printSchedule = function(print = TRUE){
       library(data.table)
       fnlSch = rbindlist(lapply(length(jobs):1, function(x){
         jb = jobs[[x]]
@@ -192,7 +193,7 @@ Schedule <- setRefClass(
         
         schJob[, c(5:11,1:4), with = F]
       }))
-      print(fnlSch)
+      if(print) print(fnlSch)
       fnlSch
     }
   )
@@ -236,24 +237,25 @@ Store <- setRefClass(
     planBatchSize = function(subsetSum, ovenIndx, indx, indxEnd, startingValue){
       ks = names(profile)
       val = profile[[ks[indx]]] # time & its forecast
+      # Add max iterations
       
-      if(notCompliesWithShelfLife(ks[indx], ks[indxEnd])){ # if cook time over 4 hours
-        print("1st")
+      if(notCompliesWithShelfLife(ks[indx], ks[indxEnd])){ # if shelf life over 4 hours
+        # print("1st")
         return(c(indx+1, getTimeToMin(ks[indx+1]), startingValue - as.numeric(profile[[ks[indx+1]]])))
       }else if(subsetSum == 0){ #base case 1: if the subset sum exactly matches the capacity 
-        print("2nd")
+        # print("2nd")
         return(c(indx,getTimeToMin(ks[indx]),startingValue))
       }else if(subsetSum < 0){ #base case 2 if the subset sum exceeds the oven capacity
-        print("3rd")
+        # print("3rd")
         return(c(indx+1, getTimeToMin(ks[indx+1]), startingValue - as.numeric(profile[[ks[indx+1]]])))
       }else if(indx == 1){ #base case 3 the current index equals zero
-        print("4th")
+        # print("4th")
         return(c(indx,getTimeToMin(ks[indx]),startingValue))
       }else if(val > ovens[[ovenIndx]]$cty & subsetSum == ovens[[ovenIndx]]$cty){ #base case 4 if a measurement exceeds the oven capacity and the subsetSum equals oven capacity
-        print("5th")
+        # print("5th")
         return(c(indx-1,getTimeToMin(ks[indx-1]),ovens[[ovenIndx]]$cty)) #???
       }else{ #complex case
-        print("6th")
+        # print("6th")
         return(planBatchSize(subsetSum-val, ovenIndx, indx-1, indxEnd, startingValue+val))
       }
     },
@@ -269,7 +271,7 @@ Store <- setRefClass(
           var = planBatchSize(ovens[[i]]$cty, i, indx, indx, 0) # ovenCapacity, ovenIdx, timeIdx, timeEndIdx, startVal
           sol[[length(sol)+1]] <- c(i, as.numeric(var[2]), as.numeric(var[3])) # ovenId, time, remaining demands
           
-          planOvens(startingValue+as.numeric(var[3]), sol, as.numeric(var[1])) # <======== to fix only one oven is used
+          planOvens(startingValue+as.numeric(var[3]), sol, as.numeric(var[1]))
           sol[[length(sol)]] = NULL # backtrack (?)
         }
       }
@@ -285,7 +287,7 @@ Store <- setRefClass(
           jb = s[[jb]]
           sch$addJob(ovens[[jb[1]]], jb[2], jb[3]) 
         }
-        mkSpn = sch$getMakespan() # start Time integer negative <============================
+        mkSpn = sch$getMakespan() 
         lenSch = length(s)
         if(mkSpn <= drtn){
           if(sch$meetsConstraints(lenSch - 1, lenSch)){
@@ -305,8 +307,8 @@ readOvenInfo = function(){
   file = data.table::fread("Files/ovenCapacityByStore.csv")
 }
 
-readProfile = function(){
-  file = data.table::fread("Files/storeProfile.csv")
+readProfile = function(storeProfile = "Files/storeProfile.csv"){
+  file = data.table::fread(storeProfile)
 }
 
 readForecast = function(){
@@ -350,18 +352,15 @@ getMinToTime = function(cooktime){
 
 
 # Main Optimizer ----------------------------------------------------------
-mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateForecast = TRUE){
+mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateForecast = TRUE, stores = c("4972", "525", "571")){
   
   sm = StoreManager$new()
   
   # Add Stores and their profiles to Store Manager
   if(updateStoreList){
-    stores = readStores()[1]
-    for(store in stores$V1){
-      # store = stores$V1[1]
-      profile = readProfile() # <=== This need to be read from BIW later
-      profile[, V1 := 525] # Impute hours with no sales
-      profile = profile[V1 == store]
+    for(store in stores){
+      cat(paste0("\n", store))
+      profile = readProfile(paste0("Files/storeProfile", store, ".txt"))
       profile[, timeMin := gsub(" ", "", paste(ifelse(4-nchar(V2) > 0, paste(rep(0, 4-nchar(V2)), collapse = ""), ""), V2, collapse = "")), by = .(V1,V2)]
       
       prof = list()
@@ -379,23 +378,38 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
     for(store in 1:length(sm$stores)){
       store = sm$stores[[store]]
       ovenInfoSt = ovenInfo[Store == store$storeId]
-      for(o in 1:nrow(ovenInfoSt)){
-        o = ovenInfoSt[o]
-        store$addOven(as.numeric(o$Capacity), as.numeric(o$AvgCookTime), as.numeric(o$CleanBetweenCooks))
+      cat(paste0("\n", store$storeId, " - ", nrow(ovenInfoSt), " ovens"))
+      if(nrow(ovenInfoSt)>0){
+        for(o in 1:nrow(ovenInfoSt)){
+          o = ovenInfoSt[o]
+          store$addOven(as.numeric(o$Capacity), as.numeric(o$AvgCookTime), as.numeric(o$CleanBetweenCooks))
+        }  
       }
     }
   }
   
   # Plan out schedules for each store
   for(store in 1:length(sm$stores)){
-    # store = sm$stores[[1]]
     store = sm$stores[[store]]
-    lenProf = length(store$profile)
-    store$planOvens(startingValue = 0, sol = list(), indx = lenProf)
+    cat(paste0("\nOptimizing schedules for Store: ", store$storeId))
     
-    # to be reviewed
-    store$trySchedules()
-    store$optSch$printSchedule()
+    if(length(store$ovens) > 0){
+      lenProf = length(store$profile)
+      store$planOvens(startingValue = 0, sol = list(), indx = lenProf)
+      
+      # to be reviewed
+      store$trySchedules() # No Optimal Schedule?
+      cat(paste0("\n -", length(store$schedules), " schedules tried"))
+      if(!is.na(store$optSch)){
+        # store$optSch$printSchedule()
+        cat(paste0("\n -Optimal schedule found by running ", length(store$optSch$jobs), " jobs.", "\n"))
+        
+      }else{
+        cat(paste0("\n -Didn't find optimal scheduel for ", store$storeId, "\n"))
+      }
+    }else{
+      cat(paste0("\n -No available oven for ", store$storeId, "\n"))
+    }
   }
   
   return(sm)
@@ -404,9 +418,9 @@ mainOptimizer = function(updateStoreList = TRUE, updateOvenInfo = TRUE, updateFo
 
 
 # Test & Run --------------------------------------------------------------
-optimal_manager = mainOptimizer()
-optimal_store = optimal_manager$stores[[1]]
-optimal_sch = optimal_store$optSch$printSchedule()
+optimal_manager = mainOptimizer(stores = c("4972", "525", "571"))
+optimal_store = optimal_manager$stores[[3]]
+optimal_sch = optimal_store$optSch$printSchedule(FALSE)
 View(optimal_sch)
 
 optimal_jobs = unique(optimal_sch[, .(jobId, jobEndTime, batchSize)])
